@@ -456,6 +456,23 @@ static void showHUDIfNeeded(void) {
 
 %hook CYUnifiedMQTTHelper
 
+// Hook loginMQTT 方法
+- (void)loginMQTT {
+    [[MqttLogManager sharedInstance] addLog:@"[MQTT HELPER] >>> loginMQTT 被调用"];
+    
+    // 打印调用堆栈
+    NSArray *callStack = [NSThread callStackSymbols];
+    for (NSString *symbol in callStack) {
+        if ([symbol containsString:@"LingLingBang"]) {
+            [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   %@", symbol]];
+        }
+    }
+    
+    %orig;
+    
+    [[MqttLogManager sharedInstance] addLog:@"[MQTT HELPER] <<< loginMQTT 完成"];
+}
+
 - (void)connectWithUsername:(NSString *)username 
                    password:(NSString *)password 
                    clientId:(NSString *)clientId 
