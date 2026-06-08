@@ -564,6 +564,57 @@ static void showHUDIfNeeded(void) {
     return self;
 }
 
+// Hook initWithDictionary 方法
+- (instancetype)initWithDictionary:(NSDictionary *)dict {
+    self = %orig;
+    [[MqttLogManager sharedInstance] addLog:@"[MQTT HELPER] initWithDictionary"];
+    [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   dict: %@", dict]];
+    
+    // 打印调用堆栈
+    NSArray *callStack = [NSThread callStackSymbols];
+    for (NSString *symbol in callStack) {
+        if ([symbol containsString:@"LingLingBang"]) {
+            [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   %@", symbol]];
+        }
+    }
+    
+    return self;
+}
+
+// Hook initWithData 方法
+- (instancetype)initWithData:(id)data {
+    self = %orig;
+    [[MqttLogManager sharedInstance] addLog:@"[MQTT HELPER] initWithData"];
+    [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   data: %@", data]];
+    
+    // 打印调用堆栈
+    NSArray *callStack = [NSThread callStackSymbols];
+    for (NSString *symbol in callStack) {
+        if ([symbol containsString:@"LingLingBang"]) {
+            [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   %@", symbol]];
+        }
+    }
+    
+    return self;
+}
+
+// Hook initWithJSON 方法
+- (instancetype)initWithJSON:(id)json {
+    self = %orig;
+    [[MqttLogManager sharedInstance] addLog:@"[MQTT HELPER] initWithJSON"];
+    [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   json: %@", json]];
+    
+    // 打印调用堆栈
+    NSArray *callStack = [NSThread callStackSymbols];
+    for (NSString *symbol in callStack) {
+        if ([symbol containsString:@"LingLingBang"]) {
+            [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   %@", symbol]];
+        }
+    }
+    
+    return self;
+}
+
 %end
 
 %hook NSURLSession
@@ -620,6 +671,31 @@ static void showHUDIfNeeded(void) {
             }
         }
     }
+}
+
+- (id)objectForKey:(NSString *)defaultName {
+    id value = %orig;
+    
+    // 记录所有读取的 key
+    if ([defaultName containsString:@"mqtt"] || 
+        [defaultName containsString:@"MQTT"] ||
+        [defaultName containsString:@"username"] ||
+        [defaultName containsString:@"password"] ||
+        [defaultName containsString:@"token"] ||
+        [defaultName containsString:@"Token"]) {
+        
+        [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT USERDEFAULTS] objectForKey: %@ = %@", defaultName, value]];
+        
+        // 打印调用堆栈
+        NSArray *callStack = [NSThread callStackSymbols];
+        for (NSString *symbol in callStack) {
+            if ([symbol containsString:@"LingLingBang"]) {
+                [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT USERDEFAULTS]   %@", symbol]];
+            }
+        }
+    }
+    
+    return value;
 }
 
 %end
