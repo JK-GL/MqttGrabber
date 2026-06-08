@@ -588,10 +588,9 @@ static void showHUDIfNeeded(void) {
     
     [[MqttLogManager sharedInstance] addLog:@"[MQTT GRABBER] Tweak 已加载！"];
     
-    // 延时 3 秒后尝试显示 HUD（确保 app 完全加载）
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
-        dispatch_get_main_queue(), ^{
-            NSLog(@"[MQTT GRABBER] ⏰ 3秒延时到期，尝试显示 HUD");
-            showHUDIfNeeded();
-        });
+    // 立即显示 HUD（不延迟，确保能抓到数据）
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSLog(@"[MQTT GRABBER] 🚀 立即显示 HUD");
+        showHUDIfNeeded();
+    });
 }
