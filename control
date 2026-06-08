@@ -1,0 +1,9 @@
+Package: com.wuling.mqttgrabber
+Name: MqttGrabber
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: MQTT Credential Grabber - 捕获 MQTT 凭据来源
+Maintainer: Minis
+Author: Minis
+Section: Tweaks
+Depends: mobilesubstrate
