@@ -182,104 +182,91 @@
 @end
 
 // ============================================
-// MARK: - HUD 控制器（参考 baojun_ble_hud）
+// MARK: - 悬浮按钮（参考 WulingBleAS）
 // ============================================
 
-@interface MqttHUDViewController : UIViewController
-@property (nonatomic, strong) UIView *hudView;
+@interface MqttFloatingButton : UIView
+@property (nonatomic, strong) UIView *capsule;
 @property (nonatomic, strong) UILabel *statusLabel;
-@property (nonatomic, assign) CGPoint dragOffset;
-@property (nonatomic, assign) BOOL isShowing;
 + (instancetype)shared;
-- (void)show;
-- (void)hide;
+- (void)installIfNeeded;
 - (void)updateStatus:(NSString *)status;
 @end
 
-@implementation MqttHUDViewController
+@implementation MqttFloatingButton
 
-static MqttHUDViewController *_shared = nil;
+static MqttFloatingButton *_shared = nil;
 
 + (instancetype)shared {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        _shared = [[MqttHUDViewController alloc] init];
+        _shared = [MqttFloatingButton new];
     });
     return _shared;
 }
 
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    self.view.backgroundColor = [UIColor clearColor];
-    [self setupHUD];
+- (UIWindow *)activeWindow {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        if (ws.activationState != UISceneActivationStateForegroundActive) continue;
+        for (UIWindow *w in ws.windows) if (w.isKeyWindow) return w;
+        if (ws.windows.count) return ws.windows.firstObject;
+    }
+    return nil;
 }
 
-- (void)setupHUD {
-    CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
-    CGFloat x = screenWidth - 180;
-    CGFloat y = 100;
-    
-    // 主 HUD 容器
-    _hudView = [[UIView alloc] initWithFrame:CGRectMake(x, y, 170, 80)];
-    _hudView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
-    _hudView.layer.cornerRadius = 16;
-    _hudView.layer.borderWidth = 1;
-    _hudView.layer.borderColor = [[UIColor colorWithRed:0.2 green:0.6 blue:1.0 alpha:0.6] CGColor];
-    _hudView.layer.shadowColor = [UIColor blackColor].CGColor;
-    _hudView.layer.shadowOffset = CGSizeMake(0, 4);
-    _hudView.layer.shadowRadius = 12;
-    _hudView.layer.shadowOpacity = 0.5;
-    _hudView.clipsToBounds = NO;
-    _hudView.hidden = YES;
-    
-    // 标题
-    UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 6, 150, 18)];
-    titleLabel.text = @"📡 MQTT 抓包";
-    titleLabel.textColor = [UIColor whiteColor];
-    titleLabel.font = [UIFont boldSystemFontOfSize:12];
-    [_hudView addSubview:titleLabel];
-    
-    // 状态标签
-    _statusLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 28, 150, 40)];
-    _statusLabel.text = @"等待抓包...";
-    _statusLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.8];
-    _statusLabel.font = [UIFont fontWithName:@"Menlo" size:10];
-    _statusLabel.numberOfLines = 3;
-    [_hudView addSubview:_statusLabel];
-    
-    // 手势
-    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
-    [_hudView addGestureRecognizer:tap];
-    
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-    [_hudView addGestureRecognizer:pan];
-    
-    [self.view addSubview:_hudView];
-}
-
-- (void)show {
-    if (_isShowing) return;
-    _isShowing = YES;
-    
+- (void)installIfNeeded {
+    if (self.capsule) return;
     dispatch_async(dispatch_get_main_queue(), ^{
-        self->_hudView.hidden = NO;
-        self->_hudView.alpha = 0;
-        [UIView animateWithDuration:0.3 animations:^{
-            self->_hudView.alpha = 1.0;
-        }];
-    });
-}
-
-- (void)hide {
-    if (!_isShowing) return;
-    _isShowing = NO;
-    
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [UIView animateWithDuration:0.3 animations:^{
-            self->_hudView.alpha = 0;
-        } completion:^(BOOL finished) {
-            self->_hudView.hidden = YES;
-        }];
+        UIWindow *window = [self activeWindow];
+        if (!window) return;
+        
+        CGFloat screenW = window.bounds.size.width;
+        CGFloat capsuleW = 120;
+        CGFloat capsuleH = 36;
+        
+        // 右上位置
+        CGFloat safeTop = 0;
+        if (@available(iOS 13.0, *)) {
+            UIWindowScene *ws = window.windowScene;
+            if (ws) safeTop = ws.statusBarManager.statusBarFrame.size.height;
+        }
+        if (safeTop == 0) safeTop = 44;
+        
+        CGFloat capsuleY = safeTop + 8;
+        CGFloat capsuleX = screenW - capsuleW - 12;
+        
+        UIView *c = [[UIView alloc] initWithFrame:CGRectMake(capsuleX, capsuleY, capsuleW, capsuleH)];
+        c.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.8];
+        c.layer.cornerRadius = capsuleH / 2;
+        c.layer.masksToBounds = YES;
+        c.layer.borderWidth = 1;
+        c.layer.borderColor = [[UIColor systemBlueColor] colorWithAlphaComponent:0.6].CGColor;
+        
+        // 图标
+        UILabel *icon = [[UILabel alloc] initWithFrame:CGRectMake(8, 0, 20, capsuleH)];
+        icon.text = @"📡";
+        icon.font = [UIFont systemFontOfSize:14];
+        [c addSubview:icon];
+        
+        // 状态标签
+        _statusLabel = [[UILabel alloc] initWithFrame:CGRectMake(28, 0, capsuleW - 36, capsuleH)];
+        _statusLabel.text = @"MQTT";
+        _statusLabel.textColor = [UIColor whiteColor];
+        _statusLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+        [c addSubview:_statusLabel];
+        
+        // 点击
+        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openLog)];
+        [c addGestureRecognizer:tap];
+        
+        // 拖动
+        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+        [c addGestureRecognizer:pan];
+        
+        [window addSubview:c];
+        self.capsule = c;
     });
 }
 
@@ -289,33 +276,38 @@ static MqttHUDViewController *_shared = nil;
     });
 }
 
-- (void)handleTap:(UITapGestureRecognizer *)gesture {
-    MqttLogViewController *vc = [[MqttLogViewController alloc] init];
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-    nav.navigationBar.barStyle = UIBarStyleBlack;
-    nav.navigationBar.tintColor = [UIColor whiteColor];
+- (void)handlePan:(UIPanGestureRecognizer *)gesture {
+    UIView *c = gesture.view;
+    UIWindow *window = [self activeWindow];
+    if (!window) return;
     
-    UIViewController *rootVC = [UIApplication sharedApplication].keyWindow.rootViewController;
-    [rootVC presentViewController:nav animated:YES completion:nil];
+    CGPoint translation = [gesture translationInView:window];
+    CGFloat halfW = c.bounds.size.width / 2;
+    CGFloat halfH = c.bounds.size.height / 2;
+    CGFloat newX = c.center.x + translation.x;
+    CGFloat newY = c.center.y + translation.y;
+    
+    // 边界
+    newX = MAX(halfW, MIN(window.bounds.size.width - halfW, newX));
+    newY = MAX(halfH, MIN(window.bounds.size.height - halfH, newY));
+    
+    c.center = CGPointMake(newX, newY);
+    [gesture setTranslation:CGPointZero inView:window];
 }
 
-- (void)handlePan:(UIPanGestureRecognizer *)gesture {
-    CGPoint location = [gesture locationInView:self.view];
-    
-    if (gesture.state == UIGestureRecognizerStateBegan) {
-        _dragOffset = CGPointMake(location.x - _hudView.frame.origin.x,
-                                  location.y - _hudView.frame.origin.y);
-    } else if (gesture.state == UIGestureRecognizerStateChanged) {
-        CGFloat newX = location.x - _dragOffset.x;
-        CGFloat newY = location.y - _dragOffset.y;
+- (void)openLog {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindow *window = [self activeWindow];
+        UIViewController *root = window.rootViewController;
+        while (root.presentedViewController) root = root.presentedViewController;
         
-        // 边界限制
-        CGRect screen = [UIScreen mainScreen].bounds;
-        newX = MAX(0, MIN(newX, screen.size.width - _hudView.frame.size.width));
-        newY = MAX(40, MIN(newY, screen.size.height - _hudView.frame.size.height - 40));
-        
-        _hudView.frame = CGRectMake(newX, newY, _hudView.frame.size.width, _hudView.frame.size.height);
-    }
+        MqttLogViewController *vc = [[MqttLogViewController alloc] init];
+        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+        nav.navigationBar.barStyle = UIBarStyleBlack;
+        nav.navigationBar.tintColor = [UIColor whiteColor];
+        nav.modalPresentationStyle = UIModalPresentationPageSheet;
+        [root presentViewController:nav animated:YES completion:nil];
+    });
 }
 
 @end
@@ -333,9 +325,9 @@ static void showHUDIfNeeded(void) {
     NSLog(@"[MQTT GRABBER] 🚀 showHUDIfNeeded 被调用!");
     
     dispatch_async(dispatch_get_main_queue(), ^{
-        MqttHUDViewController *hud = [MqttHUDViewController shared];
-        [hud show];
-        [hud updateStatus:@"已启动，等待抓包..."];
+        MqttFloatingButton *btn = [MqttFloatingButton shared];
+        [btn installIfNeeded];
+        [btn updateStatus:@"已启动"];
     });
 }
 
@@ -357,7 +349,7 @@ static void showHUDIfNeeded(void) {
     }
     
     // 更新 HUD 状态
-    [[MqttHUDViewController shared] updateStatus:@"正在获取 MQTT 凭据..."];
+    [[MqttFloatingButton shared] updateStatus:@"获取凭据..."];
     
     %orig;
     
@@ -477,9 +469,7 @@ static void showHUDIfNeeded(void) {
     [[MqttLogManager sharedInstance] addLog:@"[MQTT CONNECT] ============================"];
     
     // 更新 HUD 状态
-    [[MqttHUDViewController shared] updateStatus:[NSString stringWithFormat:@"已连接\nUser: %@\nPass: %@", 
-        [username substringToIndex:MIN(8, username.length)], 
-        [password substringToIndex:MIN(8, password.length)]]];
+    [[MqttFloatingButton shared] updateStatus:@"已连接"];
     
     %orig;
 }
@@ -538,7 +528,7 @@ static void showHUDIfNeeded(void) {
 %end
 
 // ============================================
-// MARK: - Hook UIApplication（参考 baojun_ble_hud）
+// MARK: - Hook UIApplication
 // ============================================
 
 %hook UIApplication
@@ -558,7 +548,7 @@ static void showHUDIfNeeded(void) {
 %end
 
 // ============================================
-// MARK: - Hook UIViewController（参考 baojun_ble_hud）
+// MARK: - Hook UIViewController
 // ============================================
 
 %hook UIViewController
@@ -576,7 +566,7 @@ static void showHUDIfNeeded(void) {
 %end
 
 // ============================================
-// MARK: - 构造函数（参考 baojun_ble_hud）
+// MARK: - 构造函数
 // ============================================
 
 %ctor {
