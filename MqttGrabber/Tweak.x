@@ -130,14 +130,40 @@
 - (void)copyLogs {
     @synchronized ([MqttLogManager sharedInstance].logs) {
         NSString *allLogs = [[MqttLogManager sharedInstance].logs componentsJoinedByString:@"\n"];
-        [UIPasteboard generalPasteboard].string = allLogs;
+        
+        // 创建临时文件
+        NSString *tempDir = NSTemporaryDirectory();
+        NSString *fileName = [NSString stringWithFormat:@"MQTT_Log_%@.txt", 
+                              [NSDateFormatter localizedStringFromDate:[NSDate date]
+                                                           dateStyle:NSDateFormatterShortStyle
+                                                           timeStyle:NSDateFormatterShortStyle]];
+        NSString *filePath = [tempDir stringByAppendingPathComponent:fileName];
+        
+        NSError *error;
+        [allLogs writeToFile:filePath atomically:YES encoding:NSUTF8StringEncoding error:&error];
+        
+        if (error) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"导出失败"
+                                                                          message:error.localizedDescription
+                                                                   preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+            return;
+        }
+        
+        // 使用系统分享面板
+        NSURL *fileURL = [NSURL fileURLWithPath:filePath];
+        UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:@[fileURL] applicationActivities:nil];
+        activityVC.excludedActivityTypes = @[UIActivityTypePrint, UIActivityTypeAssignToContact];
+        
+        // iPad 适配
+        if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+            activityVC.popoverPresentationController.sourceView = self.view;
+            activityVC.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 0, 0);
+        }
+        
+        [self presentViewController:activityVC animated:YES completion:nil];
     }
-    
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"已复制"
-                                                                  message:@"日志已复制到剪贴板"
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
