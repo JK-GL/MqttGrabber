@@ -131,12 +131,14 @@
     @synchronized ([MqttLogManager sharedInstance].logs) {
         NSString *allLogs = [[MqttLogManager sharedInstance].logs componentsJoinedByString:@"\n"];
         
-        // 创建临时文件
+        // 创建临时文件 - 使用安全的文件名（不含 /）
         NSString *tempDir = NSTemporaryDirectory();
-        NSString *fileName = [NSString stringWithFormat:@"MQTT_Log_%@.txt", 
-                              [NSDateFormatter localizedStringFromDate:[NSDate date]
-                                                           dateStyle:NSDateFormatterShortStyle
-                                                           timeStyle:NSDateFormatterShortStyle]];
+        
+        // 使用时间戳作为文件名
+        NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+        formatter.dateFormat = @"yyyyMMdd_HHmmss";
+        NSString *timeStr = [formatter stringFromDate:[NSDate date]];
+        NSString *fileName = [NSString stringWithFormat:@"MQTT_Log_%@.txt", timeStr];
         NSString *filePath = [tempDir stringByAppendingPathComponent:fileName];
         
         NSError *error;
