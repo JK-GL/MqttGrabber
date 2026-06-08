@@ -82,7 +82,7 @@
                                          style:UIBarButtonItemStylePlain
                                         target:self
                                         action:@selector(clearLogs)],
-        [[UIBarButtonItem alloc] initWithTitle:@"复制"
+        [[UIBarButtonItem alloc] initWithTitle:@"导出"
                                          style:UIBarButtonItemStylePlain
                                         target:self
                                         action:@selector(copyLogs)]
