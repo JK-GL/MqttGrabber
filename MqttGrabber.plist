@@ -1,1 +1,23 @@
-{ Filter = { Bundles = ( "com.cloudy.linglingbang" ); }; }
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Filter</key>
+	<dict>
+		<key>Bundles</key>
+		<array>
+			<string>com.cloudy.LingLingBang</string>
+		</array>
+		<key>Executables</key>
+		<array>
+			<string>Runner</string>
+			<string>LingLingBang</string>
+		</array>
+	</dict>
+	<key>Entry</key>
+	<dict>
+		<key>enabled</key>
+		<true/>
+	</dict>
+</dict>
+</plist>
