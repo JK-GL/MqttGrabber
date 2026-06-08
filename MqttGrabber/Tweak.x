@@ -150,7 +150,7 @@
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellId];
         cell.textLabel.numberOfLines = 0;
-        cell.textLabel.font = [UIFont monospacedSystemFontOfSize:12 weight:UIFontWeightRegular];
+        cell.textLabel.font = [UIFont fontWithName:@"Menlo" size:12];
         cell.textLabel.textColor = [UIColor whiteColor];
         cell.backgroundColor = [UIColor blackColor];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
