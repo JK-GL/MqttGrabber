@@ -468,6 +468,14 @@ static void showHUDIfNeeded(void) {
     [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT CONNECT] ClientID: %@", clientId]];
     [[MqttLogManager sharedInstance] addLog:@"[MQTT CONNECT] ============================"];
     
+    // 打印调用堆栈
+    NSArray *callStack = [NSThread callStackSymbols];
+    for (NSString *symbol in callStack) {
+        if ([symbol containsString:@"LingLingBang"]) {
+            [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT CONNECT]   %@", symbol]];
+        }
+    }
+    
     // 更新 HUD 状态
     [[MqttFloatingButton shared] updateStatus:@"已连接"];
     
@@ -489,6 +497,73 @@ static void showHUDIfNeeded(void) {
     %orig;
 }
 
+// Hook getTokenAndLoginWithVin 方法
+- (void)getTokenAndLoginWithVin:(NSString *)vin 
+                       complete:(void(^)(id pair))complete {
+    
+    [[MqttLogManager sharedInstance] addLog:@"[MQTT HELPER] >>> getTokenAndLoginWithVin"];
+    [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   vin: %@", vin]];
+    
+    // 包装回调，拦截返回的 pair
+    void(^wrappedComplete)(id pair) = ^(id pair) {
+        [[MqttLogManager sharedInstance] addLog:@"[MQTT HELPER] <<< getTokenAndLoginWithVin 回调返回"];
+        [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   pair class: %@", [pair class]]];
+        
+        // 用 KVC 读取所有属性
+        unsigned int count;
+        objc_property_t *props = class_copyPropertyList([pair class], &count);
+        for (unsigned int i = 0; i < count; i++) {
+            const char *name = property_getName(props[i]);
+            NSString *key = [NSString stringWithUTF8String:name];
+            @try {
+                id value = [pair valueForKey:key];
+                [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   pair.%@ = %@", key, value]];
+            } @catch (NSException *e) {
+                [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   pair.%@ = (异常)", key]];
+            }
+        }
+        free(props);
+        
+        // 打印调用堆栈
+        NSArray *callStack = [NSThread callStackSymbols];
+        for (NSString *symbol in callStack) {
+            if ([symbol containsString:@"LingLingBang"]) {
+                [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   %@", symbol]];
+            }
+        }
+        
+        if (complete) {
+            complete(pair);
+        }
+    };
+    
+    %orig(vin, wrappedComplete);
+}
+
+// Hook initWithPair 方法
+- (instancetype)initWithPair:(id)pair {
+    self = %orig;
+    [[MqttLogManager sharedInstance] addLog:@"[MQTT HELPER] initWithPair"];
+    [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   pair class: %@", [pair class]]];
+    
+    // 用 KVC 读取所有属性
+    unsigned int count;
+    objc_property_t *props = class_copyPropertyList([pair class], &count);
+    for (unsigned int i = 0; i < count; i++) {
+        const char *name = property_getName(props[i]);
+        NSString *key = [NSString stringWithUTF8String:name];
+        @try {
+            id value = [pair valueForKey:key];
+            [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   pair.%@ = %@", key, value]];
+        } @catch (NSException *e) {
+            [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HELPER]   pair.%@ = (异常)", key]];
+        }
+    }
+    free(props);
+    
+    return self;
+}
+
 %end
 
 %hook NSURLSession
@@ -498,31 +573,53 @@ static void showHUDIfNeeded(void) {
     
     NSString *url = request.URL.absoluteString;
     
-    if ([url containsString:@"botai"] || 
-        [url containsString:@"mqtt"] ||
-        [url containsString:@"token"]) {
-        
-        [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HTTP] >>> Request: %@ %@", request.HTTPMethod, url]];
-        
-        if (request.HTTPBody) {
-            NSString *body = [[NSString alloc] initWithData:request.HTTPBody encoding:NSUTF8StringEncoding];
-            [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HTTP] >>> Body: %@", body]];
-        }
-        
-        void(^wrappedHandler)(NSData *, NSURLResponse *, NSError *) = ^(NSData *data, NSURLResponse *response, NSError *error) {
-            if (data) {
-                NSString *responseStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-                [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HTTP] <<< Response: %@", responseStr]];
-            }
-            if (completionHandler) {
-                completionHandler(data, response, error);
-            }
-        };
-        
-        return %orig(request, wrappedHandler);
+    // 拦截所有请求，记录到日志
+    [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HTTP] >>> Request: %@ %@", request.HTTPMethod, url]];
+    
+    if (request.HTTPBody) {
+        NSString *body = [[NSString alloc] initWithData:request.HTTPBody encoding:NSUTF8StringEncoding];
+        [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HTTP] >>> Body: %@", body]];
     }
     
-    return %orig(request, completionHandler);
+    void(^wrappedHandler)(NSData *, NSURLResponse *, NSError *) = ^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (data) {
+            NSString *responseStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+            [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT HTTP] <<< Response: %@", responseStr]];
+        }
+        if (completionHandler) {
+            completionHandler(data, response, error);
+        }
+    };
+    
+    return %orig(request, wrappedHandler);
+}
+
+%end
+
+// Hook NSUserDefaults
+%hook NSUserDefaults
+
+- (void)setObject:(id)value forKey:(NSString *)defaultName {
+    %orig;
+    
+    // 记录所有写入的 key
+    if ([defaultName containsString:@"mqtt"] || 
+        [defaultName containsString:@"MQTT"] ||
+        [defaultName containsString:@"username"] ||
+        [defaultName containsString:@"password"] ||
+        [defaultName containsString:@"token"] ||
+        [defaultName containsString:@"Token"]) {
+        
+        [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT USERDEFAULTS] setObject: %@ = %@", defaultName, value]];
+        
+        // 打印调用堆栈
+        NSArray *callStack = [NSThread callStackSymbols];
+        for (NSString *symbol in callStack) {
+            if ([symbol containsString:@"LingLingBang"]) {
+                [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[MQTT USERDEFAULTS]   %@", symbol]];
+            }
+        }
+    }
 }
 
 %end
