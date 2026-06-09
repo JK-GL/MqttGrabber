@@ -787,6 +787,84 @@ static void showHUDIfNeeded(void) {
 // MARK: - 构造函数
 // ============================================
 
+// ============================================
+// MARK: - Hook CommonCrypto (Hash 拦截)
+// ============================================
+
+#import <CommonCrypto/CommonDigest.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
+static NSString *kKnownUsername = @"d4a107b765f38550d13a24b54fdcdecf";
+static NSString *kKnownPassword = @"7c039ddfbdad50f3d0caf974fbcd5a5f";
+static NSUInteger g_hashCount = 0;
+
+static void checkHash(const char *type, const void *input, CC_LONG len, const uint8_t *digest, size_t digestLen) {
+    g_hashCount++;
+    
+    NSMutableString *hex = [NSMutableString stringWithCapacity:digestLen * 2];
+    for (size_t i = 0; i < digestLen; i++) {
+        [hex appendFormat:@"%02x", digest[i]];
+    }
+    
+    BOOL match = [hex isEqualToString:kKnownUsername] || [hex isEqualToString:kKnownPassword];
+    if (match) {
+        NSData *data = [NSData dataWithBytes:input length:len];
+        NSString *inputStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: [data description];
+        
+        [[MqttLogManager sharedInstance] addLog:@"========================================"];
+        [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[HASH] ✅ MATCH %s = %@", type, hex]];
+        [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[HASH] 输入: %@", inputStr]];
+        [[MqttLogManager sharedInstance] addLog:@"========================================"];
+        
+        NSArray *stack = [NSThread callStackSymbols];
+        for (NSString *s in stack) {
+            if ([s containsString:@"LingLingBang"]) {
+                [[MqttLogManager sharedInstance] addLog:[NSString stringWithFormat:@"[HASH]   %@", s]];
+            }
+        }
+        
+        [[MqttFloatingButton shared] updateStatus:@"✅ 找到!"];
+    }
+    
+    if (g_hashCount % 500 == 0) {
+        [[MqttFloatingButton shared] updateStatus:[NSString stringWithFormat:@"Hash %lu", (unsigned long)g_hashCount]];
+    }
+}
+
+// Hook CC_MD5
+extern unsigned char *CC_MD5(const void *data, CC_LONG len, unsigned char *md);
+static unsigned char *(*orig_CC_MD5)(const void *data, CC_LONG len, unsigned char *md);
+static unsigned char *hook_CC_MD5(const void *data, CC_LONG len, unsigned char *md) {
+    unsigned char *result = orig_CC_MD5(data, len, md);
+    if (result && len > 0) checkHash("MD5", data, len, result, CC_MD5_DIGEST_LENGTH);
+    return result;
+}
+
+// Hook CC_SHA256
+extern unsigned char *CC_SHA256(const void *data, CC_LONG len, unsigned char *md);
+static unsigned char *(*orig_CC_SHA256)(const void *data, CC_LONG len, unsigned char *md);
+static unsigned char *hook_CC_SHA256(const void *data, CC_LONG len, unsigned char *md) {
+    unsigned char *result = orig_CC_SHA256(data, len, md);
+    if (result && len > 0) {
+        checkHash("SHA256", data, len, result, CC_SHA256_DIGEST_LENGTH);
+        checkHash("SHA256[:16]", data, len, result, 16);
+    }
+    return result;
+}
+
+// Hook CC_SHA1
+extern unsigned char *CC_SHA1(const void *data, CC_LONG len, unsigned char *md);
+static unsigned char *(*orig_CC_SHA1)(const void *data, CC_LONG len, unsigned char *md);
+static unsigned char *hook_CC_SHA1(const void *data, CC_LONG len, unsigned char *md) {
+    unsigned char *result = orig_CC_SHA1(data, len, md);
+    if (result && len > 0) checkHash("SHA1[:16]", data, len, result, 16);
+    return result;
+}
+
+#pragma clang diagnostic pop
+
 %ctor {
     NSLog(@"[MQTT GRABBER] =============================================");
     NSLog(@"[MQTT GRABBER] 🚀🚀🚀 MQTT 抓包插件已加载! 🚀🚀🚀");
@@ -795,6 +873,12 @@ static void showHUDIfNeeded(void) {
     NSLog(@"[MQTT GRABBER] =============================================");
     
     [[MqttLogManager sharedInstance] addLog:@"[MQTT GRABBER] Tweak 已加载！"];
+    
+    // Hook hash 函数
+    MSHookFunction(CC_MD5, hook_CC_MD5, (void **)&orig_CC_MD5);
+    MSHookFunction(CC_SHA256, hook_CC_SHA256, (void **)&orig_CC_SHA256);
+    MSHookFunction(CC_SHA1, hook_CC_SHA1, (void **)&orig_CC_SHA1);
+    [[MqttLogManager sharedInstance] addLog:@"[MQTT GRABBER] Hash hook 已安装"];
     
     // 立即显示 HUD（不延迟，确保能抓到数据）
     dispatch_async(dispatch_get_main_queue(), ^{
